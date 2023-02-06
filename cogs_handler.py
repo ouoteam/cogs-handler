@@ -1,15 +1,37 @@
 import os
 import discord
-
-# from pathlib import Path
 from discord.ext import tasks, commands
-from helpers.remote import get_remote_url
+from helpers.remote import (
+    get_remote_url,
+    get_local_commit,
+    get_updates_info,
+    merge_up_to,
+)
 
 NOTIFY_CHANNEL = 1070956195130650704
 
 
+class UpdateActionsView(discord.ui.View):
+    def __init__(self, commit_id: str):
+        super().__init__(timeout=None)
+        self.commit_id = commit_id
+
+    @discord.ui.button(
+        label="合併到這個提交",
+        custom_id="merge-up-to-this-commit",
+        style=discord.ButtonStyle.danger,
+    )
+    async def merge_button_callback(
+        self, button: discord.ui.Button, interaction: discord.Interaction
+    ):
+        await interaction.response.defer()
+        merge_up_to(self.commit_id)
+        button.disabled = True
+        await interaction.response.edit_message(view=self)
+
+
 class CogsHandler(discord.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: discord.Bot):
         self.bot = bot
         self.check_git_changes.start()
 
@@ -24,7 +46,18 @@ class CogsHandler(discord.Cog):
 
     @tasks.loop(minutes=3)
     async def check_git_changes(self):
-        print(f"[INFO] Checking remote for updates")
+        if updates := get_updates_info():
+            await (self.bot.get_partial_messageable(NOTIFY_CHANNEL)).send(
+                embed=discord.Embed(
+                    colour=discord.Colour.dark_theme(),
+                    title="有新更新",
+                    fields=[
+                        discord.EmbedField("目標提交代碼", f"```{updates[0]}```"),
+                        discord.EmbedField("目標提交訊息", updates[1]),
+                    ],
+                ).set_footer(text=f"本機提交代碼: {get_local_commit()}"),
+                view=UpdateActionsView(updates[0]),
+            )
 
     @check_git_changes.before_loop
     async def before_check_loop(self):
@@ -47,7 +80,7 @@ class CogsHandler(discord.Cog):
         )
 
     @check_git_changes.error
-    async def check_loop_error(self, error):
+    async def check_loop_error(self, error: Exception):
         await (self.bot.get_partial_messageable(NOTIFY_CHANNEL)).send(
             embed=discord.Embed(
                 colour=discord.Colour.dark_theme(),
@@ -98,5 +131,5 @@ class CogsHandler(discord.Cog):
                 await ctx.respond(output)
 
 
-def setup(bot):
+def setup(bot: discord.Bot):
     bot.add_cog(CogsHandler(bot))

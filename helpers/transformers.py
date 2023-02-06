@@ -1,4 +1,5 @@
 import importlib
+from types import ModuleType
 from collections.abc import Iterable
 
 
@@ -12,6 +13,6 @@ def deduplicate_iterables(*iterables) -> list:
     return list(dict.fromkeys(chain_iterables(iterables)))
 
 
-def reload_module(module):
+def reload_module(module: ModuleType):
     # this is not recommended
     return importlib.reload(module)
