@@ -25,9 +25,9 @@ class UpdateActionsView(discord.ui.View):
         self, button: discord.ui.Button, interaction: discord.Interaction
     ):
         await interaction.response.defer()
-        merge_up_to(self.commit_id)
+        await interaction.followup.send(f"```{merge_up_to(self.commit_id)}```")
         button.disabled = True
-        await interaction.response.edit_message(view=self)
+        await interaction.message.edit(view=self)
 
 
 class CogsHandler(discord.Cog):
@@ -48,6 +48,7 @@ class CogsHandler(discord.Cog):
     async def check_git_changes(self):
         if updates := get_updates_info():
             await (self.bot.get_partial_messageable(NOTIFY_CHANNEL)).send(
+                " ".join([f"<@{owner}>" for owner in self.bot.owner_ids]),
                 embed=discord.Embed(
                     colour=discord.Colour.dark_theme(),
                     title="有新更新",
@@ -55,7 +56,7 @@ class CogsHandler(discord.Cog):
                         discord.EmbedField("目標提交代碼", f"```{updates[0]}```"),
                         discord.EmbedField("目標提交訊息", updates[1]),
                     ],
-                ).set_footer(text=f"本機提交代碼: {get_local_commit()}"),
+                ),  # .set_footer(text=f"本機提交代碼: {get_local_commit()}")
                 view=UpdateActionsView(updates[0]),
             )
 
